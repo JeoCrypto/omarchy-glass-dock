@@ -2,7 +2,7 @@
 
 A small, pixel-aligned, macOS-style dock for [Omarchy](https://omarchy.org) and Hyprland, built with [Quickshell](https://quickshell.org) (which Omarchy already ships).
 
-![Glass Dock preview](preview.png)
+![Glass Dock demo: sliding up, app names on hover and opening an app](demo.webp)
 
 - **Sharp on HiDPI.** Icons load at full device resolution. The geometry uses whole logical pixels and the border is a one-physical-pixel hairline at 2×, so nothing gets upscaled or blurred.
 - **Follows your Omarchy theme.** Colours come from the active theme and update live when you switch themes.
