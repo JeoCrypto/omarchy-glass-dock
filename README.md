@@ -64,6 +64,7 @@ To start it at login, add `o.launch_on_start("qs -c glass-dock")` to `~/.config/
 |---|---|
 | `~/.config/glass-dock/pinned` | Pinned apps: one desktop-file id per line, e.g. `org.gnome.Nautilus`, `chromium`, `foot`. Without this file the dock pins Files, Chromium and Foot. Changes apply immediately. |
 | `~/.config/glass-dock/aliases` | Optional `<app-id> <desktop-id>` pairs, for windows whose app id doesn't match a desktop file (e.g. `my.custom.terminal foot`). |
+| `~/.config/glass-dock/launcher` | Optional command for the app-grid button (default `omarchy-menu toggle apps`), e.g. `omarchy-shell shell toggle io.github.jeocrypto.launchpad`. |
 
 Sizes (icon size, cell size, gaps, padding, radius) are at the top of `Dock.qml` (`~/.config/omarchy/plugins/io.github.jeocrypto.glass-dock/Dock.qml` when installed as a plugin).
 

@@ -75,6 +75,19 @@ Item {
   }
 
   // ---- Pinned apps ----
+  // Command for the app-grid button; ~/.config/glass-dock/launcher overrides it
+  // (e.g. "omarchy-shell shell toggle io.github.jeocrypto.launchpad").
+  property string launcherCommand: "omarchy-menu toggle apps"
+
+  FileView {
+    path: root.configDir + "/launcher"
+    watchChanges: true
+    __printErrors: false
+    onFileChanged: reload()
+    onLoaded: root.launcherCommand = text().trim() || "omarchy-menu toggle apps"
+    onLoadFailed: root.launcherCommand = "omarchy-menu toggle apps"
+  }
+
   // Used until ~/.config/glass-dock/pinned exists
   readonly property var defaultPinned: ["org.gnome.Nautilus", "chromium", "foot"]
   property var pinned: defaultPinned
@@ -241,7 +254,7 @@ Item {
         // Launcher (apps grid), drawn so it is crisp at any scale.
         DockCell {
           label: "Apps"
-          onActivated: { Quickshell.execDetached(["omarchy-menu", "toggle", "apps"]); dock.hide() }
+          onActivated: { Quickshell.execDetached(["bash", "-lc", root.launcherCommand]); dock.hide() }
 
           Grid {
             anchors.centerIn: parent
