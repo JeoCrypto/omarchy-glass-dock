@@ -75,7 +75,9 @@ Item {
   }
 
   // ---- Pinned apps ----
-  property var pinned: []
+  // Used until ~/.config/glass-dock/pinned exists
+  readonly property var defaultPinned: ["org.gnome.Nautilus", "chromium", "foot"]
+  property var pinned: defaultPinned
 
   readonly property string configDir: Quickshell.env("HOME") + "/.config/glass-dock"
 
@@ -83,7 +85,9 @@ Item {
     path: root.configDir + "/pinned"
     watchChanges: true
     onFileChanged: reload()
+    __printErrors: false
     onLoaded: root.pinned = text().split("\n").map(s => s.trim()).filter(s => s && !s.startsWith("#"))
+    onLoadFailed: root.pinned = root.defaultPinned
   }
 
   // Map an app id to a desktop entry, with optional user aliases.

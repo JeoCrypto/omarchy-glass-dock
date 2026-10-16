@@ -12,20 +12,13 @@ A small, pixel-aligned, macOS-style dock for [Omarchy](https://omarchy.org) and 
 
 ## Install
 
+Glass Dock is an Omarchy shell plugin:
+
 ```bash
-git clone https://github.com/JeoCrypto/omarchy-glass-dock
-cd omarchy-glass-dock
-./install.sh
-qs -c glass-dock &
+omarchy plugin add https://github.com/JeoCrypto/omarchy-glass-dock --enable
 ```
 
-### Start at login
-
-Add to `~/.config/hypr/autostart.lua`:
-
-```lua
-o.launch_on_start("qs -c glass-dock")
-```
+It loads with the Omarchy shell, so there's nothing to add to your autostart.
 
 ### Frosted blur (recommended)
 
@@ -35,19 +28,50 @@ Add to `~/.config/hypr/looknfeel.lua`:
 hl.layer_rule({ match = { namespace = "^glass-dock$" }, blur = true, ignore_alpha = 0.2 })
 ```
 
+### Update
+
+```bash
+omarchy plugin update io.github.jeocrypto.glass-dock
+omarchy restart shell
+```
+
+The dock stays loaded while the shell runs, so restart the shell to pick up a new version.
+
+### Remove
+
+```bash
+omarchy plugin remove io.github.jeocrypto.glass-dock
+```
+
+Your pinned-apps and aliases files in `~/.config/glass-dock/` are left in place; delete that folder if you don't want them.
+
+### Run without the plugin system (optional)
+
+Glass Dock can also run as its own Quickshell instance:
+
+```bash
+git clone https://github.com/JeoCrypto/omarchy-glass-dock
+cd omarchy-glass-dock
+./install.sh
+qs -c glass-dock &
+```
+
+To start it at login, add `o.launch_on_start("qs -c glass-dock")` to `~/.config/hypr/autostart.lua`.
+
 ## Configure
 
 | File | What it does |
 |---|---|
-| `~/.config/glass-dock/pinned` | Pinned apps: one desktop-file id per line, e.g. `org.gnome.Nautilus`, `chromium`, `foot`. Changes apply immediately. |
+| `~/.config/glass-dock/pinned` | Pinned apps: one desktop-file id per line, e.g. `org.gnome.Nautilus`, `chromium`, `foot`. Without this file the dock pins Files, Chromium and Foot. Changes apply immediately. |
 | `~/.config/glass-dock/aliases` | Optional `<app-id> <desktop-id>` pairs, for windows whose app id doesn't match a desktop file (e.g. `my.custom.terminal foot`). |
 
-Sizes (icon size, cell size, gaps, padding, radius) are at the top of `~/.config/quickshell/glass-dock/shell.qml`.
+Sizes (icon size, cell size, gaps, padding, radius) are at the top of `Dock.qml` (`~/.config/omarchy/plugins/io.github.jeocrypto.glass-dock/Dock.qml` when installed as a plugin).
 
 To show or hide the dock from a keybinding or script:
 
 ```bash
-qs -c glass-dock ipc call dock toggle
+omarchy-shell glass-dock toggle                   # plugin
+qs -c glass-dock ipc call glass-dock toggle       # standalone
 ```
 
 ## Requirements

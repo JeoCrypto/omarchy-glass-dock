@@ -12,7 +12,7 @@ dock_dir="$HOME/.config/quickshell/glass-dock"
 config_dir="$HOME/.config/glass-dock"
 
 mkdir -p "$dock_dir" "$config_dir"
-cp "$src/shell.qml" "$dock_dir/shell.qml"
+cp "$src/shell.qml" "$src/Dock.qml" "$dock_dir/"
 
 if [[ ! -f $config_dir/pinned ]]; then
   cat >"$config_dir/pinned" <<'EOF'
