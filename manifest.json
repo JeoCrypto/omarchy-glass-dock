@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.jeocrypto.glass-dock",
+  "name": "Glass Dock",
+  "version": "1.1.0",
+  "author": "JeoCrypto",
+  "description": "A small, pixel-aligned, auto-hiding macOS-style dock that follows your Omarchy theme.",
+  "kinds": ["panel"],
+  "keepLoaded": true,
+  "entryPoints": {
+    "panel": "Dock.qml"
+  }
+}
