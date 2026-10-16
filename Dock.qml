@@ -28,7 +28,8 @@ Item {
 
   // Panel lifecycle (`omarchy-shell shell summon|hide <id>`): show or hide the dock.
   property bool opened: revealed
-  function open() { revealed = true; hideTimer.restart() }
+  // Stays up until close(), or until the pointer enters the dock and leaves it.
+  function open() { hideTimer.stop(); revealed = true }
   function close() { revealed = false }
 
   // ---- Geometry (logical px) ----
