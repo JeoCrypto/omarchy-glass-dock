@@ -315,7 +315,7 @@ Item {
       anchors.fill: parent
       radius: 10
       color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, mouse.pressed ? 0.18 : 0.10)
-      opacity: mouse.containsMouse ? 1 : 0
+      opacity: cellHover.hovered ? 1 : 0
       Behavior on opacity { NumberAnimation { duration: 120 } }
     }
 
@@ -330,7 +330,7 @@ Item {
 
     // macOS-style name label above the hovered icon
     Rectangle {
-      visible: mouse.containsMouse && cell.label !== ""
+      visible: cellHover.hovered && cell.label !== ""
       anchors.horizontalCenter: parent.horizontalCenter
       y: -root.padding - height - 8
       width: labelText.implicitWidth + 20
@@ -348,6 +348,13 @@ Item {
         font.family: "sans-serif"
         font.pixelSize: 12
       }
+    }
+
+    // HoverHandler also reacts to pointers moved by scripts (hyprctl), unlike
+    // MouseArea hover, so labels and highlights show in recorded demos too.
+    HoverHandler {
+      id: cellHover
+      cursorShape: Qt.PointingHandCursor
     }
 
     MouseArea {
