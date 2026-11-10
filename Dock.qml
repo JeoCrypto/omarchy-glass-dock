@@ -132,11 +132,16 @@ Item {
   // Save the pinned list. Comments and blank lines in an existing file are
   // kept; without a file, the defaults are written out first.
   //
-  // The save is one owned process with a deadline: it creates the folder,
-  // writes a temporary file and renames it into place. The dock's own list
-  // changes only once that process reports success, so a failed save never
-  // leaves the dock showing pins that were not written. `flashKey` names the
-  // icon that reports the outcome. Returns false when a save is already running.
+  // The save is one owned, time-limited run (BoundedRun): it creates the
+  // folder, writes a temporary file and renames it into place. The run always
+  // reports back exactly once, also when it could not be started or overran,
+  // and only after its processes are gone; a new save is refused until then.
+  // The dock's own list changes only when the save succeeded, so a failed save
+  // never leaves the dock showing pins that were not written, and it says
+  // "Could not save". A temporary file is removed when the save fails; one left
+  // by a save that was killed outright is removed by a later save. `flashKey`
+  // names the icon that reports the outcome. Returns false when a save is
+  // already running.
   function writePinned(change, flashKey, doneMessage) {
     if (pinnedSave.running) return false
     let lines
@@ -150,24 +155,23 @@ Item {
     pinnedSave.pendingPinned = lines.map(l => l.trim()).filter(l => l && !l.startsWith("#"))
     pinnedSave.flashKey = flashKey || ""
     pinnedSave.doneMessage = doneMessage || ""
-    pinnedSave.command = ["sh", "-c",
-      'dir=$1; tmp=; trap \'[ -n "$tmp" ] && rm -f -- "$tmp"\' EXIT; ' +
-      'mkdir -p -- "$dir" && tmp=$(mktemp "$dir/.pinned.XXXXXX") && printf %s "$2" > "$tmp" && mv -f -- "$tmp" "$dir/pinned" && tmp=',
-      "sh", root.configDir, content]
-    pinnedSave.running = true
-    pinnedSaveDeadline.restart()
-    return true
+    return pinnedSave.start(["sh", "-c",
+      'dir=$1; tmp=; clean() { [ -n "$tmp" ] && rm -f -- "$tmp"; }; trap clean EXIT; trap "clean; exit 1" TERM INT HUP; ' +
+      'mkdir -p -- "$dir" && find "$dir" -maxdepth 1 -name ".pinned.??????" -mmin +1 -delete && ' +
+      'tmp=$(mktemp "$dir/.pinned.XXXXXX") && printf %s "$2" > "$tmp" && mv -f -- "$tmp" "$dir/pinned" && tmp=',
+      "sh", root.configDir, content])
   }
 
   readonly property int maxPinnedBytes: 16384
 
-  Process {
+  BoundedRun {
     id: pinnedSave
     property var pendingPinned: []
     property string flashKey: ""
     property string doneMessage: ""
-    onExited: (exitCode, exitStatus) => {
-      pinnedSaveDeadline.stop()
+    seconds: 3
+    maxBytes: 1024
+    onFinished: function(exitCode, output, errors) {
       if (exitCode === 0) {
         root.pinned = pendingPinned
         root.flash(flashKey, doneMessage)
@@ -175,13 +179,6 @@ Item {
         root.flash(flashKey, "Could not save")
       }
     }
-  }
-
-  // A save that has not finished in time is stopped; onExited then reports the failure.
-  Timer {
-    id: pinnedSaveDeadline
-    interval: 3000
-    onTriggered: if (pinnedSave.running) pinnedSave.signal(9)
   }
 
   // A short message shown above one icon (by its key).

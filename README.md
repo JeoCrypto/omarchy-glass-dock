@@ -118,6 +118,14 @@ qs -c glass-dock &
 
 To start it at login, add `o.launch_on_start("qs -c glass-dock")` to `~/.config/hypr/autostart.lua`.
 
+## Development
+
+```bash
+python3 -m unittest discover -s tests -v
+```
+
+Tests cover the runner that saves the pinned list: one report per run, including a save that cannot be started or overruns, and no processes left behind. The Quickshell cases run in a throwaway Quickshell instance and are skipped without Quickshell and a Wayland session.
+
 ## Requirements
 
 - Omarchy 4 (Hyprland 0.55+ with Lua config, Quickshell 0.3+)
@@ -134,4 +142,4 @@ To start it at login, add `o.launch_on_start("qs -c glass-dock")` to `~/.config/
   <a href="https://github.com/JeoCrypto/omarchy-snap-layouts">Snap Layouts</a>
 </p>
 
-<p align="center"><sub>MIT licence</sub></p>
+<p align="center"><sub>Contributed by <a href="https://vgsi.pt">VGSI</a> · MIT licence</sub></p>
