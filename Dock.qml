@@ -6,6 +6,12 @@
 //   ~/.config/glass-dock/aliases  optional "<app-id> <desktop-id>" pairs, for windows
 //                                 whose app id doesn't match a desktop file
 //
+// Right-click an icon to remove it from the dock, or to keep an app that is
+// only there because it is running.
+//
+// ~/.config/glass/level (clear | glass | frosted | solid), if present, sets how
+// see-through the dock is.
+//
 // Colours follow the current Omarchy theme.
 //
 // All geometry is in whole logical pixels; at 2x scaling every edge lands on
@@ -13,6 +19,7 @@
 // stay sharp instead of being upscaled.
 
 import QtQuick
+import QtQuick.Effects
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
@@ -74,6 +81,24 @@ Item {
     onTriggered: themeColors.reload()
   }
 
+  // ---- Glass level ----
+  // ~/.config/glass/level (clear | glass | frosted | solid), written by the
+  // `glass-level` command, sets how see-through the dock is. Missing file: glass.
+  readonly property var glassAlphas: ({ clear: 0.32, glass: 0.55, frosted: 0.78, solid: 1.0 })
+  property real glassAlpha: 0.55
+
+  FileView {
+    path: Quickshell.env("HOME") + "/.config/glass/level"
+    watchChanges: true
+    __printErrors: false
+    onFileChanged: reload()
+    onLoaded: {
+      const alpha = root.glassAlphas[text().trim()]
+      root.glassAlpha = alpha !== undefined ? alpha : 0.55
+    }
+    onLoadFailed: root.glassAlpha = 0.55
+  }
+
   // ---- Pinned apps ----
   // Command for the app-grid button; ~/.config/glass-dock/launcher overrides it
   // (e.g. "omarchy-shell shell toggle io.github.jeocrypto.launchpad").
@@ -95,12 +120,29 @@ Item {
   readonly property string configDir: Quickshell.env("HOME") + "/.config/glass-dock"
 
   FileView {
+    id: pinnedFile
     path: root.configDir + "/pinned"
     watchChanges: true
     onFileChanged: reload()
     __printErrors: false
     onLoaded: root.pinned = text().split("\n").map(s => s.trim()).filter(s => s && !s.startsWith("#"))
     onLoadFailed: root.pinned = root.defaultPinned
+  }
+
+  // The folder has to exist before the first save.
+  Component.onCompleted: Quickshell.execDetached(["mkdir", "-p", root.configDir])
+
+  // Save the pinned list. Comments and blank lines in an existing file are
+  // kept; without a file, the defaults are written out first.
+  function writePinned(change) {
+    let lines
+    try { lines = pinnedFile.text().split("\n") } catch (e) { lines = [] }
+    if (lines.filter(l => l.trim() && !l.trim().startsWith("#")).length === 0 && root.pinned === root.defaultPinned)
+      lines = root.defaultPinned.slice()
+    while (lines.length && lines[lines.length - 1].trim() === "") lines.pop()
+    lines = change(lines)
+    pinnedFile.setText(lines.join("\n") + "\n")
+    root.pinned = lines.map(l => l.trim()).filter(l => l && !l.startsWith("#"))
   }
 
   // Map an app id to a desktop entry, with optional user aliases.
@@ -145,14 +187,14 @@ Item {
       const e = DesktopEntries.byId(id) || DesktopEntries.heuristicLookup(id)
       if (!e || seen[e.id]) continue
       seen[e.id] = true
-      out.push({ key: e.id, entry: e, appId: id })
+      out.push({ key: e.id, entry: e, appId: id, pinned: true })
     }
     for (const t of toplevels) {
       if (ignoredAppIds.test(t.appId)) continue
       const key = entryKey(t.appId)
       if (seen[key]) continue
       seen[key] = true
-      out.push({ key: key, entry: entryFor(t.appId), appId: t.appId })
+      out.push({ key: key, entry: entryFor(t.appId), appId: t.appId, pinned: false })
     }
     return out
   }
@@ -173,6 +215,13 @@ Item {
     dock.hide()
   }
 
+  // Right-click: keep an app in the dock, or remove it. A removed app that is
+  // still running stays visible until it closes, so a slip is easy to undo.
+  function togglePinned(item) {
+    if (item.pinned) writePinned(lines => lines.filter(l => l.trim() !== item.appId))
+    else writePinned(lines => lines.concat([item.key]))
+  }
+
   // ---- Auto-hide ----
   property bool revealed: false
 
@@ -183,6 +232,15 @@ Item {
     function reveal(): void { root.revealed = true; hideTimer.restart() }
     function conceal(): void { root.revealed = false }
     function toggle(): void { root.revealed = !root.revealed }
+    // Add or remove a pinned app by desktop-file id, e.g. from a script.
+    function pin(id: string): void {
+      const app = String(id || "").trim()
+      if (app && root.pinned.indexOf(app) < 0) root.writePinned(lines => lines.concat([app]))
+    }
+    function unpin(id: string): void {
+      const app = String(id || "").trim()
+      if (app) root.writePinned(lines => lines.filter(l => l.trim() !== app))
+    }
   }
 
   Timer {
@@ -238,12 +296,49 @@ Item {
       width: row.width + root.padding * 2
       height: root.dockHeight
       radius: root.radius
-      color: Qt.rgba(root.bg.r, root.bg.g, root.bg.b, 0.55)
+      color: Qt.rgba(root.bg.r, root.bg.g, root.bg.b, root.glassAlpha)
       // Hairline: half a logical pixel is exactly one physical pixel at 2x.
       border.width: 0.5
       border.color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.14)
 
       Behavior on y { NumberAnimation { id: slide; duration: 220; easing.type: Easing.OutCubic } }
+      Behavior on color { ColorAnimation { duration: 180 } }
+
+      // Glass edge: a soft sheen across the top half and a rim that is bright
+      // along the top and fades down the sides, like light catching thick glass.
+      Rectangle {
+        anchors.fill: parent
+        radius: parent.radius
+        gradient: Gradient {
+          GradientStop { position: 0.0; color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.10) }
+          GradientStop { position: 0.5; color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.0) }
+        }
+      }
+      Item {
+        id: rimFade
+        anchors.fill: parent
+        visible: false
+        layer.enabled: true
+        Rectangle {
+          anchors.fill: parent
+          gradient: Gradient {
+            GradientStop { position: 0.0; color: "#ffffffff" }
+            GradientStop { position: 0.85; color: "#00ffffff" }
+          }
+        }
+      }
+      Rectangle {
+        anchors.fill: parent
+        radius: parent.radius
+        color: "transparent"
+        border.width: 1
+        border.color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.36)
+        layer.enabled: true
+        layer.effect: MultiEffect {
+          maskEnabled: true
+          maskSource: rimFade
+        }
+      }
 
       Row {
         id: row
@@ -283,7 +378,12 @@ Item {
           DockCell {
             required property var modelData
             readonly property int windowCount: root.windowsFor(modelData.key).length
-            label: modelData.entry ? modelData.entry.name : modelData.appId
+            readonly property string appName: modelData.entry ? modelData.entry.name : modelData.appId
+            label: appName
+            onRightClicked: {
+              flash(modelData.pinned ? "Removed from Dock" : "Kept in Dock")
+              root.togglePinned(modelData)
+            }
             running: windowCount > 0
             onActivated: root.activate(modelData)
             onMiddleClicked: Quickshell.execDetached(["uwsm-app", "--", "gtk-launch", modelData.key])
@@ -307,6 +407,10 @@ Item {
     property bool running: false
     signal activated()
     signal middleClicked()
+    signal rightClicked()
+    property string flashText: ""
+    function flash(message) { flashText = message; flashTimer.restart() }
+    Timer { id: flashTimer; interval: 1400; onTriggered: cell.flashText = "" }
 
     width: root.cellSize
     height: root.cellSize
@@ -330,7 +434,7 @@ Item {
 
     // macOS-style name label above the hovered icon
     Rectangle {
-      visible: cellHover.hovered && cell.label !== ""
+      visible: (cellHover.hovered && cell.label !== "") || cell.flashText !== ""
       anchors.horizontalCenter: parent.horizontalCenter
       y: -root.padding - height - 8
       width: labelText.implicitWidth + 20
@@ -343,7 +447,8 @@ Item {
       Text {
         id: labelText
         anchors.centerIn: parent
-        text: cell.label
+        text: cell.flashText !== "" ? cell.flashText : cell.label
+        textFormat: Text.PlainText
         color: root.fg
         font.family: "sans-serif"
         font.pixelSize: 12
@@ -361,9 +466,13 @@ Item {
       id: mouse
       anchors.fill: parent
       hoverEnabled: true
-      acceptedButtons: Qt.LeftButton | Qt.MiddleButton
+      acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
       cursorShape: Qt.PointingHandCursor
-      onClicked: (e) => e.button === Qt.MiddleButton ? cell.middleClicked() : cell.activated()
+      onClicked: (e) => {
+        if (e.button === Qt.RightButton) cell.rightClicked()
+        else if (e.button === Qt.MiddleButton) cell.middleClicked()
+        else cell.activated()
+      }
     }
   }
 }

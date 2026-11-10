@@ -4,7 +4,7 @@
 
 <p align="center">
   <b>A small, pixel-sharp, macOS-style dock for <a href="https://omarchy.org">Omarchy</a>.</b><br>
-  Auto-hides · app names on hover · running-app dots · follows your theme
+  Auto-hides · app names on hover · right-click to keep or remove apps · follows your theme
 </p>
 
 <p align="center">
@@ -54,26 +54,40 @@ hl.layer_rule({ match = { namespace = "^glass-dock$" }, blur = true, ignore_alph
       A running-app dot under each icon, the app name above the hovered icon, and a hand-drawn app-grid button that opens Omarchy's Apps menu.
     </td>
   </tr>
+  <tr>
+    <td valign="top">
+      <h3>📌 Keep or remove with a right-click</h3>
+      Right-click an icon to remove it from the dock. Right-click an app that is only there because it's running to keep it. No file to edit.
+    </td>
+    <td valign="top">
+      <h3>🪟 A glass edge</h3>
+      The rim is brightest along the top and fades down the sides, with a soft sheen across the top half, like light catching thick glass.
+    </td>
+  </tr>
 </table>
 
-**Clicking:** click opens or focuses an app, clicking again cycles through its windows, and middle-click opens a new window.
+**Clicking:** click opens or focuses an app, clicking again cycles through its windows, middle-click opens a new window, and right-click keeps the app in the dock or removes it. A removed app that is still running stays visible until it closes, so a slip is easy to undo.
 
 ## Configure
 
 | File | What it does |
 |---|---|
-| `~/.config/glass-dock/pinned` | Pinned apps: one desktop-file id per line, e.g. `org.gnome.Nautilus`, `chromium`, `foot`. Without this file the dock pins Files, Chromium and Foot. Changes apply immediately. |
+| `~/.config/glass-dock/pinned` | Pinned apps: one desktop-file id per line, e.g. `org.gnome.Nautilus`, `chromium`, `foot`. Without this file the dock pins Files, Chromium and Foot. Changes apply immediately. Right-clicking an icon edits this file for you; comments and blank lines are kept. |
 | `~/.config/glass-dock/aliases` | Optional `<app-id> <desktop-id>` pairs, for windows whose app id doesn't match a desktop file (e.g. `my.custom.terminal foot`). |
 | `~/.config/glass-dock/launcher` | Optional command for the app-grid button (default `omarchy-menu toggle apps`), e.g. `omarchy-shell shell toggle io.github.jeocrypto.launchpad` for [Spotlight Apps](https://github.com/JeoCrypto/omarchy-spotlight-apps). |
 
 Sizes (icon size, cell size, gaps, padding, radius) are at the top of `Dock.qml` (`~/.config/omarchy/plugins/io.github.jeocrypto.glass-dock/Dock.qml` when installed as a plugin).
 
-To show or hide the dock from a keybinding or script:
+To show or hide the dock, or change its apps, from a keybinding or script:
 
 ```bash
 omarchy-shell glass-dock toggle                   # plugin
+omarchy-shell glass-dock pin org.gnome.Nautilus   # add an app
+omarchy-shell glass-dock unpin org.gnome.Nautilus # remove it
 qs -c glass-dock ipc call glass-dock toggle       # standalone
 ```
+
+**How see-through it is.** If `~/.config/glass/level` exists and holds `clear`, `glass`, `frosted` or `solid`, the dock follows it. [Control Center](https://github.com/JeoCrypto/omarchy-control-center) ships an optional `glass-level` command that sets this for the bar, menus and dock together. Without the file the dock looks as it always did.
 
 ## Update and remove
 
@@ -114,6 +128,7 @@ To start it at login, add `o.launch_on_start("qs -c glass-dock")` to `~/.config/
   <b>Part of the Golden Gate set for Omarchy</b><br>
   <a href="https://github.com/JeoCrypto/omarchy-golden-gate-theme">Golden Gate theme</a> ·
   <a href="https://github.com/JeoCrypto/omarchy-glass-dock">Glass Dock</a> ·
+  <a href="https://github.com/JeoCrypto/omarchy-control-center">Control Center</a> ·
   <a href="https://github.com/JeoCrypto/omarchy-spotlight-apps">Spotlight Apps</a> ·
   <a href="https://github.com/JeoCrypto/omarchy-snap-layouts">Snap Layouts</a>
 </p>
