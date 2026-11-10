@@ -129,21 +129,71 @@ Item {
     onLoadFailed: root.pinned = root.defaultPinned
   }
 
-  // The folder has to exist before the first save.
-  Component.onCompleted: Quickshell.execDetached(["mkdir", "-p", root.configDir])
-
   // Save the pinned list. Comments and blank lines in an existing file are
   // kept; without a file, the defaults are written out first.
-  function writePinned(change) {
+  //
+  // The save is one owned process with a deadline: it creates the folder,
+  // writes a temporary file and renames it into place. The dock's own list
+  // changes only once that process reports success, so a failed save never
+  // leaves the dock showing pins that were not written. `flashKey` names the
+  // icon that reports the outcome. Returns false when a save is already running.
+  function writePinned(change, flashKey, doneMessage) {
+    if (pinnedSave.running) return false
     let lines
     try { lines = pinnedFile.text().split("\n") } catch (e) { lines = [] }
     if (lines.filter(l => l.trim() && !l.trim().startsWith("#")).length === 0 && root.pinned === root.defaultPinned)
       lines = root.defaultPinned.slice()
     while (lines.length && lines[lines.length - 1].trim() === "") lines.pop()
     lines = change(lines)
-    pinnedFile.setText(lines.join("\n") + "\n")
-    root.pinned = lines.map(l => l.trim()).filter(l => l && !l.startsWith("#"))
+    const content = lines.join("\n") + "\n"
+    if (content.length > root.maxPinnedBytes) { root.flash(flashKey, "Too many pinned apps"); return false }
+    pinnedSave.pendingPinned = lines.map(l => l.trim()).filter(l => l && !l.startsWith("#"))
+    pinnedSave.flashKey = flashKey || ""
+    pinnedSave.doneMessage = doneMessage || ""
+    pinnedSave.command = ["sh", "-c",
+      'dir=$1; tmp=; trap \'[ -n "$tmp" ] && rm -f -- "$tmp"\' EXIT; ' +
+      'mkdir -p -- "$dir" && tmp=$(mktemp "$dir/.pinned.XXXXXX") && printf %s "$2" > "$tmp" && mv -f -- "$tmp" "$dir/pinned" && tmp=',
+      "sh", root.configDir, content]
+    pinnedSave.running = true
+    pinnedSaveDeadline.restart()
+    return true
   }
+
+  readonly property int maxPinnedBytes: 16384
+
+  Process {
+    id: pinnedSave
+    property var pendingPinned: []
+    property string flashKey: ""
+    property string doneMessage: ""
+    onExited: (exitCode, exitStatus) => {
+      pinnedSaveDeadline.stop()
+      if (exitCode === 0) {
+        root.pinned = pendingPinned
+        root.flash(flashKey, doneMessage)
+      } else {
+        root.flash(flashKey, "Could not save")
+      }
+    }
+  }
+
+  // A save that has not finished in time is stopped; onExited then reports the failure.
+  Timer {
+    id: pinnedSaveDeadline
+    interval: 3000
+    onTriggered: if (pinnedSave.running) pinnedSave.signal(9)
+  }
+
+  // A short message shown above one icon (by its key).
+  property string flashKey: ""
+  property string flashMessage: ""
+  function flash(key, message) {
+    if (!key || !message) return
+    flashKey = key
+    flashMessage = message
+    flashClear.restart()
+  }
+  Timer { id: flashClear; interval: 1400; onTriggered: { root.flashKey = ""; root.flashMessage = "" } }
 
   // Map an app id to a desktop entry, with optional user aliases.
   property var aliases: ({})
@@ -203,10 +253,17 @@ Item {
     return ToplevelManager.toplevels.values.filter(t => !ignoredAppIds.test(t.appId) && entryKey(t.appId) === key)
   }
 
+  // gtk-launch strips a trailing ".desktop" itself, so an id that already ends
+  // in it (org.telegram.desktop) needs the suffix spelled out to be found.
+  function launch(item) {
+    if (!item || !item.key) return
+    Quickshell.execDetached(["uwsm-app", "--", "gtk-launch", item.entry ? item.key + ".desktop" : item.key])
+  }
+
   function activate(item) {
     const wins = windowsFor(item.key)
     if (wins.length === 0) {
-      Quickshell.execDetached(["uwsm-app", "--", "gtk-launch", item.key])
+      launch(item)
     } else {
       // Focus the app; if it's already focused, cycle to its next window.
       const i = wins.findIndex(w => w.activated)
@@ -218,8 +275,17 @@ Item {
   // Right-click: keep an app in the dock, or remove it. A removed app that is
   // still running stays visible until it closes, so a slip is easy to undo.
   function togglePinned(item) {
-    if (item.pinned) writePinned(lines => lines.filter(l => l.trim() !== item.appId))
-    else writePinned(lines => lines.concat([item.key]))
+    if (item.pinned) writePinned(lines => lines.filter(l => l.trim() !== item.appId), item.key, "Removed from Dock")
+    else writePinned(lines => lines.concat([item.key]), item.key, "Kept in Dock")
+  }
+
+  // An icon name taken from a window's app id is used only when it is a plain
+  // theme icon name. An app id is chosen by the client, and Qt would load a
+  // name that is a path as an image file.
+  readonly property var plainIconName: /^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/
+  function iconNameFor(item) {
+    if (item.entry) return item.entry.icon
+    return plainIconName.test(String(item.appId || "")) ? item.appId : "application-x-executable"
   }
 
   // ---- Auto-hide ----
@@ -235,11 +301,13 @@ Item {
     // Add or remove a pinned app by desktop-file id, e.g. from a script.
     function pin(id: string): void {
       const app = String(id || "").trim()
-      if (app && root.pinned.indexOf(app) < 0) root.writePinned(lines => lines.concat([app]))
+      if (app && root.pinned.indexOf(app) < 0) root.writePinned(lines => lines.concat([app]), root.entryKey(app), "Kept in Dock")
     }
+    // The pinned apps the dock is showing, one id per line.
+    function pinned(): string { return root.pinned.join("\n") }
     function unpin(id: string): void {
       const app = String(id || "").trim()
-      if (app) root.writePinned(lines => lines.filter(l => l.trim() !== app))
+      if (app) root.writePinned(lines => lines.filter(l => l.trim() !== app), root.entryKey(app), "Removed from Dock")
     }
   }
 
@@ -270,7 +338,7 @@ Item {
     id: dock
     anchors.bottom: true
     margins.bottom: root.bottomMargin
-    implicitWidth: Math.max(card.width, 1) + 40   // side room for edge labels
+    implicitWidth: Math.max(card.width, 1) + 160   // side room for edge labels
     implicitHeight: root.dockHeight + root.labelSpace
     color: "transparent"
     exclusiveZone: 0
@@ -380,18 +448,16 @@ Item {
             readonly property int windowCount: root.windowsFor(modelData.key).length
             readonly property string appName: modelData.entry ? modelData.entry.name : modelData.appId
             label: appName
-            onRightClicked: {
-              flash(modelData.pinned ? "Removed from Dock" : "Kept in Dock")
-              root.togglePinned(modelData)
-            }
+            flashKey: modelData.key
+            onRightClicked: root.togglePinned(modelData)
             running: windowCount > 0
             onActivated: root.activate(modelData)
-            onMiddleClicked: Quickshell.execDetached(["uwsm-app", "--", "gtk-launch", modelData.key])
+            onMiddleClicked: root.launch(modelData)
 
             IconImage {
               anchors.centerIn: parent
               implicitSize: root.iconSize
-              source: Quickshell.iconPath(modelData.entry ? modelData.entry.icon : modelData.appId, "application-x-executable")
+              source: Quickshell.iconPath(root.iconNameFor(modelData), "application-x-executable")
               asynchronous: true
             }
           }
@@ -408,9 +474,8 @@ Item {
     signal activated()
     signal middleClicked()
     signal rightClicked()
-    property string flashText: ""
-    function flash(message) { flashText = message; flashTimer.restart() }
-    Timer { id: flashTimer; interval: 1400; onTriggered: cell.flashText = "" }
+    property string flashKey: ""
+    readonly property string flashText: flashKey !== "" && root.flashKey === flashKey ? root.flashMessage : ""
 
     width: root.cellSize
     height: root.cellSize

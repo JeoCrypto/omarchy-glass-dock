@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <img src="demo.webp" alt="Glass Dock demo: sliding up, app names on hover and opening an app" width="100%">
+  <img src="demo.webp" alt="Glass Dock demo: sliding up, app names on hover, opening an app, and removing and keeping an app with a right-click" width="100%">
 </p>
 
 ## Get started
@@ -72,7 +72,7 @@ hl.layer_rule({ match = { namespace = "^glass-dock$" }, blur = true, ignore_alph
 
 | File | What it does |
 |---|---|
-| `~/.config/glass-dock/pinned` | Pinned apps: one desktop-file id per line, e.g. `org.gnome.Nautilus`, `chromium`, `foot`. Without this file the dock pins Files, Chromium and Foot. Changes apply immediately. Right-clicking an icon edits this file for you; comments and blank lines are kept. |
+| `~/.config/glass-dock/pinned` | Pinned apps: one desktop-file id per line, e.g. `org.gnome.Nautilus`, `chromium`, `foot`. Without this file the dock pins Files, Chromium and Foot. Changes apply immediately. Right-clicking an icon edits this file for you; comments and blank lines are kept. The dock changes only once the file is saved; if saving fails it says so and leaves everything as it was. |
 | `~/.config/glass-dock/aliases` | Optional `<app-id> <desktop-id>` pairs, for windows whose app id doesn't match a desktop file (e.g. `my.custom.terminal foot`). |
 | `~/.config/glass-dock/launcher` | Optional command for the app-grid button (default `omarchy-menu toggle apps`), e.g. `omarchy-shell shell toggle io.github.jeocrypto.launchpad` for [Spotlight Apps](https://github.com/JeoCrypto/omarchy-spotlight-apps). |
 
@@ -84,6 +84,7 @@ To show or hide the dock, or change its apps, from a keybinding or script:
 omarchy-shell glass-dock toggle                   # plugin
 omarchy-shell glass-dock pin org.gnome.Nautilus   # add an app
 omarchy-shell glass-dock unpin org.gnome.Nautilus # remove it
+omarchy-shell glass-dock pinned                   # list the pinned apps
 qs -c glass-dock ipc call glass-dock toggle       # standalone
 ```
 
