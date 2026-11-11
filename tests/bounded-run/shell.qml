@@ -1,6 +1,7 @@
 // Runs BoundedRun through the cases that matter and prints one line per case:
 //   CASE <name> PASS|FAIL <details>
-// Started by tests/test_bounded_run.py with BoundedRun.qml copied next to it.
+// Started by tests/test_bounded_run.py with BoundedRun.qml copied next to it
+// and stand-ins for pgrep and pkill in blind/.
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -42,11 +43,33 @@ ShellRoot {
     // A supervisor that cannot be asked to stop is stopped from outside,
     // together with what it started.
     { name: "stops-a-stuck-supervisor", argv: ["sleep", "33.3333"], seconds: 20, cancelAfter: 300,
-      launcher: ["env", "--ignore-signal=TERM", "bash"],
+      launcher: ["setsid", "env", "--ignore-signal=TERM", "bash"],
       check: (c, o, e, ms) => c !== 0 && ms < 6000, gone: "sleep 33.3333" },
+    // The supervisor's own cleanup fails after the command has ended and been
+    // collected (its look at the session never comes back empty). The run must
+    // not be reported as a success, and what the command left behind is
+    // stopped from outside, by the session the run was started with.
+    { name: "failed-cleanup-is-a-failure", launcher: root.blind,
+      argv: ["bash", "-c", "set -m; sleep 34.5678 >/dev/null 2>&1 & disown; echo done"],
+      check: (c, o, e, ms) => c === 125 && o.trim() === "done" && e === subject.cleanupFailed && ms < 6000,
+      gone: "sleep 34.5678" },
+    // The cleanup from outside cannot confirm the session is empty either.
+    { name: "unconfirmed-cleanup-is-reported", launcher: root.blind, cleaner: root.blindCleaner,
+      argv: ["bash", "-c", "set -m; sleep 2.7183 >/dev/null 2>&1 & disown; echo done"],
+      check: (c, o, e, ms) => c === 125 && e === subject.notConfirmed && ms < 9000 },
+    { name: "runs-again-after-failed-cleanup", argv: ["printf", "again"],
+      check: (c, o, e) => c === 0 && o === "again" },
     { name: "refuses-overlap", argv: ["sleep", "0.3"], overlap: true,
       check: (c, o, e) => c === 0 }
   ]
+
+  // A shell that finds stand-ins for pgrep and pkill first (written next to
+  // this file by the test): the look at the session always reports a process
+  // and nothing is stopped, so a cleanup run by it can never be confirmed.
+  readonly property string blindPath:
+    "PATH=" + Qt.resolvedUrl("blind").toString().replace("file://", "") + ":" + Quickshell.env("PATH")
+  readonly property var blind: ["setsid", "env", blindPath, "bash"]
+  readonly property var blindCleaner: ["env", blindPath, "bash"]
 
   property bool overlapRefused: true
   property var pendingVerdict: null
@@ -60,7 +83,8 @@ ShellRoot {
     subject.maxBytes = t.maxBytes || 4096
     subject.graceSeconds = t.graceSeconds || 3
     subject.input = t.input || ""
-    subject.launcher = t.launcher || ["bash"]
+    subject.launcher = t.launcher || ["setsid", "bash"]
+    subject.cleaner = t.cleaner || ["bash"]
     began = Date.now()
     const accepted = subject.start(t.argv)
     if (!accepted) { report(t.name, false, "start() refused"); return }
@@ -117,5 +141,5 @@ ShellRoot {
   Timer { id: advance; interval: 50; onTriggered: root.next() }
   Timer { interval: 100; running: true; onTriggered: root.next() }
   // The whole suite has its own limit.
-  Timer { interval: 60000; running: true; onTriggered: { console.log("CASE suite FAIL timed out at " + root.index); Qt.quit() } }
+  Timer { interval: 90000; running: true; onTriggered: { console.log("CASE suite FAIL timed out at " + root.index); Qt.quit() } }
 }

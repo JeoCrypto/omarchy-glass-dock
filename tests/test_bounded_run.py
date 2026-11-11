@@ -16,7 +16,8 @@ ROOT = Path(__file__).resolve().parents[1]
 EXPECTED = ['success', 'exit-code-and-errors', 'output-cap', 'input', 'time-limit',
             'failed-start', 'runs-again-after-failed-start', 'deadline-stops-stragglers',
             'normal-end-leaves-nothing', 'cancel', 'stops-a-stuck-supervisor',
-            'refuses-overlap']
+            'failed-cleanup-is-a-failure', 'unconfirmed-cleanup-is-reported',
+            'runs-again-after-failed-cleanup', 'refuses-overlap']
 
 
 class BoundedRunTests(unittest.TestCase):
@@ -26,6 +27,12 @@ class BoundedRunTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             shutil.copy(ROOT / 'BoundedRun.qml', d)
             shutil.copy(ROOT / 'tests/bounded-run/shell.qml', d)
+            # Stand-ins used by the cases where the cleanup cannot be confirmed.
+            blind = Path(d) / 'blind'
+            blind.mkdir()
+            for name, body in (('pgrep', 'echo 1'), ('pkill', 'exit 0')):
+                (blind / name).write_text(f'#!/bin/sh\n{body}\n')
+                (blind / name).chmod(0o755)
             done = subprocess.run(['quickshell', '--no-color', '-p', d], capture_output=True,
                                   text=True, timeout=120)
         log = done.stdout + done.stderr

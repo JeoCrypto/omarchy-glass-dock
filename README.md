@@ -124,7 +124,7 @@ To start it at login, add `o.launch_on_start("qs -c glass-dock")` to `~/.config/
 python3 -m unittest discover -s tests -v
 ```
 
-Tests cover the runner that saves the pinned list: one report per run, including a save that cannot be started or overruns, and no processes left behind. The Quickshell cases run in a throwaway Quickshell instance and are skipped without Quickshell and a Wayland session.
+Tests cover the runner that saves the pinned list: one report per run, including a save that cannot be started or overruns, no processes left behind, and a cleanup that fails reported as a failure. The Quickshell cases run in a throwaway Quickshell instance and are skipped without Quickshell and a Wayland session.
 
 ## Requirements
 
